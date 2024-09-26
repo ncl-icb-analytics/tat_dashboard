@@ -1,0 +1,36 @@
+# For python projects only to set up venv
+# Do not use packages outside of safelist. Speak to head of data science and have package added to safe list
+# The libraries used by your code should be listed here
+# See https://nhsd-git.digital.nhs.uk/data-services/analytics-service/iuod/rap-community-of-practice/-/blob/master/python/project-structure-and-packaging.md
+
+# Python version = 3.12.*
+
+# Data manipulation
+numpy==2.0.0
+pandas==2.2.2
+
+# Data visualisation
+plotly == 5.22.0
+matplotlib == 3.9.0
+great-tables == 0.9.0
+
+# Interface
+#streamlit 1.36.0
+#dash == 2.17.1
+
+# SQL connections
+pyodbc==5.1.0
+sqlalchemy==2.0.31
+
+# Excel output
+#openpyxl==3.1.4
+
+# Testing
+#pytest==8.2.2
+#pytest-html==4.1.1
+
+# Dependencies of the above packages
+ipykernel==6.29.4
+nbformat==5.10.4
+toml==0.10.2
+pathlib2==2.3.6
