@@ -1,17 +1,16 @@
 ---
 title: "tat_dashboard_data"
 author: "Arush Mohan"
-date: "2024-09-26"
+date: "`r Sys.Date()`"
 params:
   input_dir: "data/providers"  # Path to the directory where provider folders are stored
-  output_file: "processed_data.csv"  # Output path for the combined data
+  output_file: "output/processed_data.csv"  # Output path for the combined data
   submission_month: "2024-08"  # The month of data submission 
 format: html
 editor: visual
 ---
 
-
-##Setup 
+##Setup
 
 ```{r}
 # Load necessary libraries
@@ -26,7 +25,6 @@ output_file <- params$output_file
 submission_month <- params$submission_month
 
 ```
-
 
 ##Load Provider Data Files
 
@@ -99,7 +97,6 @@ write_csv(combined_data, output_file)
 cat("Processed data saved to:", output_file)
 
 ```
-
 
 ##Uploading Combined Dataset to the Sandpit
 
