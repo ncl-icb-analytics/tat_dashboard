@@ -102,6 +102,7 @@ cat("Processed data saved to:", output_file)
 
 ##Uploading Combined Dataset to the Sandpit
 
+###Establishing a connection ot the Sandpit
 ```{r}
 
 # Connecting to the Sandpit
@@ -113,7 +114,7 @@ con <- dbConnect(odbc::odbc(),
 ```
 
 
-
+###Uploading the data and transforming according to type
 ```{r}
 
 # Function to replace or append data based on the data type (freeze or flex)
@@ -125,63 +126,83 @@ upload_to_sql <- function(combined_data, con, table_name) {
   
   # Replace old flex data with freeze data
   for (i in seq_len(nrow(freeze_data))) {
-    # Extract relevant details
     freeze_row <- freeze_data[i, ]
     provider_code <- freeze_row$provider_code
     month <- freeze_row$month
     year <- freeze_row$year
     
-    # SQL Query to delete old flex data for the freeze month
-    delete_query <- paste0("DELETE FROM ", table_name, 
-                           " WHERE provider_code = '", provider_code, 
-                           "' AND month = '", month, 
-                           "' AND year = '", year, 
-                           "' AND data_type = 'Flex'")
-    
-    # Execute the delete query
-    dbExecute(con, delete_query)
-    
-    # Insert the freeze data into the SQL table
-    dbWriteTable(con, table_name, freeze_row, append = TRUE, row.names = FALSE)
-  }
-  
-  # For the flex data, either replace or append
-  for (i in seq_len(nrow(flex_data))) {
-    # Extract relevant details
-    flex_row <- flex_data[i, ]
-    provider_code <- flex_row$provider_code
-    month <- flex_row$month
-    year <- flex_row$year
-    
-    # SQL Query to check if flex data already exists
-    check_query <- paste0("SELECT COUNT(*) FROM ", table_name, 
-                          " WHERE provider_code = '", provider_code, 
-                          "' AND month = '", month, 
-                          "' AND year = '", year, 
-                          "' AND data_type = 'Flex'")
-    
-    # Execute the query to check existence
-    result <- dbGetQuery(con, check_query)
-    
-    if (result[1, 1] > 0) {
-      # If flex data exists, delete the old flex data
+    tryCatch({
+      # SQL Query to delete old flex data for the freeze month
       delete_query <- paste0("DELETE FROM ", table_name, 
                              " WHERE provider_code = '", provider_code, 
                              "' AND month = '", month, 
                              "' AND year = '", year, 
                              "' AND data_type = 'Flex'")
+      
+      # Execute the delete query
       dbExecute(con, delete_query)
-    }
+      message("Old flex data for ", provider_code, " (", month, " ", year, ") successfully deleted.")
+      
+      # Insert the freeze data into the SQL table
+      dbWriteTable(con, table_name, freeze_row, append = TRUE, row.names = FALSE)
+      message("New freeze data for ", provider_code, " (", month, " ", year, ") successfully uploaded.")
+      
+    }, error = function(e) {
+      warning("Error processing freeze data for ", provider_code, " (", month, " ", year, "): ", e$message)
+    })
+  }
+  
+  # For the flex data, either replace or append
+  for (i in seq_len(nrow(flex_data))) {
+    flex_row <- flex_data[i, ]
+    provider_code <- flex_row$provider_code
+    month <- flex_row$month
+    year <- flex_row$year
     
-    # Insert the new flex data into the SQL table
-    dbWriteTable(con, table_name, flex_row, append = TRUE, row.names = FALSE)
+    tryCatch({
+      # SQL Query to check if flex data already exists
+      check_query <- paste0("SELECT COUNT(*) FROM ", table_name, 
+                            " WHERE provider_code = '", provider_code, 
+                            "' AND month = '", month, 
+                            "' AND year = '", year, 
+                            "' AND data_type = 'Flex'")
+      
+      # Execute the query to check existence
+      result <- dbGetQuery(con, check_query)
+      
+      if (result[1, 1] > 0) {
+        # If flex data exists, delete the old flex data
+        delete_query <- paste0("DELETE FROM ", table_name, 
+                               " WHERE provider_code = '", provider_code, 
+                               "' AND month = '", month, 
+                               "' AND year = '", year, 
+                               "' AND data_type = 'Flex'")
+        dbExecute(con, delete_query)
+        message("Existing flex data for ", provider_code, " (", month, " ", year, ") successfully deleted.")
+      }
+      
+      # Insert the new flex data into the SQL table
+      dbWriteTable(con, table_name, flex_row, append = TRUE, row.names = FALSE)
+      message("New flex data for ", provider_code, " (", month, " ", year, ") successfully uploaded.")
+      
+    }, error = function(e) {
+      warning("Error processing flex data for ", provider_code, " (", month, " ", year, "): ", e$message)
+    })
   }
 }
 
 # Example of running the upload process
-upload_to_sql(combined_data, con, "your_sql_table_name")
+tryCatch({
+  con <- connect_to_sql()
+  upload_to_sql(combined_data, con, "your_sql_table_name")
+}, error = function(e) {
+  warning("Error in the upload process: ", e$message)
+}, finally = {
+  if (exists("con") && !is.null(con)) {
+    dbDisconnect(con)
+    message("Disconnected from SQL Server.")
+  }
+})
 
-# Disconnect from the database
-dbDisconnect(con)
 
 ```
