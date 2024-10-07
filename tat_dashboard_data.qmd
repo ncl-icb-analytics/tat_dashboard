@@ -4,8 +4,7 @@ author: "Arush Mohan"
 date: "`r Sys.Date()`"
 params:
   input_dir: "data/providers"  # Path to the directory where provider folders are stored
-  output_file: "output/processed_data.csv"  # Output path for the combined data
-  submission_month: "2024-08"  # The month of data submission 
+  submission_date: 20240801  # The date of data submission 
 format: html
 editor: source
 ---
@@ -93,7 +92,7 @@ combined_data <- process_provider_files(provider_files)
 ```{r}
 
 # Write the combined data to a CSV file
-write_csv(combined_data, output_file)
+write_csv(combined_data, paste0('output/', "combined_dataset_", ymd(params$submission_date), ".csv"))
 
 # Output a message
 cat("Processed data saved to:", output_file)
