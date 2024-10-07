@@ -7,7 +7,7 @@ params:
   output_file: "output/processed_data.csv"  # Output path for the combined data
   submission_month: "2024-08"  # The month of data submission 
 format: html
-editor: visual
+editor: source
 ---
 
 ##Setup
@@ -103,6 +103,7 @@ cat("Processed data saved to:", output_file)
 ##Uploading Combined Dataset to the Sandpit
 
 ###Establishing a connection ot the Sandpit
+
 ```{r}
 
 # Connecting to the Sandpit
@@ -113,8 +114,8 @@ con <- dbConnect(odbc::odbc(),
                  TrustedConnection = TRUE)
 ```
 
-
 ###Uploading the data and transforming according to type
+
 ```{r}
 
 # Function to replace or append data based on the data type (freeze or flex)
@@ -191,7 +192,7 @@ upload_to_sql <- function(combined_data, con, table_name) {
   }
 }
 
-# Example of running the upload process
+# running the upload process
 tryCatch({
   con <- connect_to_sql()
   upload_to_sql(combined_data, con, "your_sql_table_name")
