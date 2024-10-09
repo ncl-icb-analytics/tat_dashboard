@@ -25,7 +25,7 @@ Flex data is checked if it already exists in the SQL Server table:
  - If it exists, it's replaced.
  - If it doesn't exist, it's appended.
 
-7.	SQL Server Upload:
+5.	SQL Server Upload:
 
 Data is uploaded or updated in a Sandpit Table following the logic mentioned.
 
