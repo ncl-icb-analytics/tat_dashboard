@@ -1,13 +1,9 @@
-# NCL sample project folder
+# TAT Dashboard Data Processing Pipeline
 
-This git repository contains a shell that should be used as the default structure for new projects
-in the analytical team.  It won't fit all circumstances perfectly, and you can make changes and issue a 
-pull request for new features / changes.
+This pipeline is designed to automate the ingestion, cleaning, transformation, and uploading of data from various providers into a Sandpit Table. 
+Providers submit data each month for the previous three months in two formats: flex (subject to revisions) and freeze (finalized data). 
+The pipeline processes this data, replaces older flex data with freeze data, and handles the appropriate logic for new flex data in Sandpit.
 
-The aim of this template is two-fold: firstly to give a common structure for analytical projects to aid
-reproducibility, secondly to allow for additional security settings as default to prevent accidental upload of files that should not be committed to Git and GitHub.
-
-__Please update/replace this README file with one relevant to your project__
 
 ## To use this template, please use the following practises:
 
