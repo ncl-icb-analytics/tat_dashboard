@@ -12,12 +12,16 @@ editor: source
 ##Setup
 
 ```{r}
+#| echo: false
 
 source('src/functions.R')
 
 ```
 
 ```{r}
+#| echo: false
+
+
 # Define parameters for the file paths and other variables
 input_dir <- params$input_dir
 
@@ -51,7 +55,7 @@ combined_data <- process_provider_files(provider_files)
 write_csv(combined_data, paste0('output/', "combined_dataset_", ymd(params$date), ".csv"))
 
 # Output a message
-cat("Processed data saved to:", output_file)
+cat("Processed data saved")
 
 ```
 
