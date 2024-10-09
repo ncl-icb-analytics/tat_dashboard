@@ -22,6 +22,7 @@ The pipeline processes this data, replaces older flex data with freeze data, and
 4.	SQL Server Upload:
   o	Data is uploaded or updated in a Sandpit Table following the logic mentioned.
 
+### Detailed information can be found in the supporting document stored in the "docs" folder. 
 
 ## To use this template, please use the following practises:
 
