@@ -165,3 +165,7 @@ cython_debug/
 
 # VS Code project files
 .vscode/
+
+#Exempt Files
+##Supporting Doc
+!docs/Pipeline_Documentation.docx
