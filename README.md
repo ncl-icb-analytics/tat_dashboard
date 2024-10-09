@@ -5,6 +5,24 @@ Providers submit data each month for the previous three months in two formats: f
 The pipeline processes this data, replaces older flex data with freeze data, and handles the appropriate logic for new flex data in Sandpit.
 
 
+# Pipeline Workflow
+1.	Monthly Data Submission:
+  o	Each month, providers submit data for the last three months. One month's data is freeze data, while the other two are flex data.
+  o	Example for October 2024:
+   -	Freeze: July 2024 data.
+   - Flex: August 2024 and September 2024 data.
+2.	Ingestion and Processing:
+  o	Files are read from their respective provider folders. The folders have been added to the "data" folder to avoid issues with Sharepoint/OneDrive. 
+  o	The file names contain metadata (submission date, provider code, month-year, and data type) that is extracted to add columns like submission_date, provider_code, month, year, and data_type to the data.
+3.	Data Upload:
+  o	Freeze data replaces old flex data for the same month.
+  o	Flex data is checked if it already exists in the SQL Server table:
+     -	If it exists, it's replaced.
+     -	If it doesn't exist, it's appended.
+4.	SQL Server Upload:
+  o	Data is uploaded or updated in a Sandpit Table following the logic mentioned.
+
+
 ## To use this template, please use the following practises:
 
 * Put any data files in the `data` folder.  This folder is explicitly named in the .gitignore file.  A further layer of security is that all xls, xlsx, csv and pdf files are also explicit ignored in the whole folder as well.  ___If you need to commit one of these files, you must use the `-f` (force) command in `commit`, but you must be sure there is no identifiable data.__
