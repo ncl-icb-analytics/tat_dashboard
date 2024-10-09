@@ -14,6 +14,7 @@ editor: source
 ```{r}
 #| echo: false
 
+library(renv)
 source('src/functions.R')
 
 ```
