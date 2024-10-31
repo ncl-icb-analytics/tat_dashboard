@@ -7,6 +7,7 @@ library(stringr)
 library(janitor)
 library(odbc)
 library(DBI)
+library(readxl)
 
 
 
@@ -36,19 +37,30 @@ process_provider_files <- function(provider_files) {
   processed_data <- provider_files %>%
     # Read CSVs into R
     rowwise() %>%
-    mutate(data = list(read_csv(file_path) %>%
+    mutate(data = list(read_csv(file_path, na = c("NULL",""), show_col_types = FALSE) %>% # set NULL and blanks to na
                          # Normalize column names: make them lowercase and replace spaces with underscores
-                         janitor::clean_names(case = "snake"))) %>%
+                         janitor::clean_names(case = "snake"))
+           ) %>%
+    
+    # probably need to do filetype conversions and cleansing here
+
     unnest(data) %>%
     # Extract month and year
     mutate(
       month = str_sub(month_year, 1, 3),
       year = paste0("20", str_sub(month_year, 4, 5)),
       submission_month = month(submission_date),
-      submission_year = year(submission_date)
+      submission_year = year(submission_date),
+      diagnostic_test_date_and_time = as.POSIXct(diagnostic_test_date_and_time, format="%d/%m/%Y %H:%M"),
+      diagnostic_test_request_date_and_time = as.POSIXct(diagnostic_test_request_date_and_time, format="%d/%m/%Y %H:%M"),
+      service_report_issue_date_and_time = as.POSIXct(service_report_issue_date_and_time, format="%d/%m/%Y %H:%M"),
+      TAT_scan = round(interval(diagnostic_test_request_date_and_time,diagnostic_test_date_and_time)/hours(1)),
+      TAT_report = round(interval(diagnostic_test_date_and_time,service_report_issue_date_and_time)/hours(1)),
+      TAT_overall = round(interval(diagnostic_test_request_date_and_time,service_report_issue_date_and_time)/hours(1))
     ) %>%
     # Reorder and add necessary columns
     select(submission_date, data_type, month, year, everything()) %>%
+
     ungroup()
   
   return(processed_data)

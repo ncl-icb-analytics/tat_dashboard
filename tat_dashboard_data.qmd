@@ -3,8 +3,9 @@ title: "tat_dashboard_data"
 author: "Arush Mohan"
 date: "`r Sys.Date()`"
 params:
-  input_dir: "data/providers"  # Path to the directory where provider folders are stored
-  submission_month: "2024-08"  # The date of data submission 
+  #input_dir: "data/providers"  # Path to the directory where provider folders are stored
+  #input_dir: "C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH"
+  submission_month: "Oct24"  # The date of data submission.
 format: html
 editor: source
 ---
@@ -14,156 +15,324 @@ editor: source
 ```{r}
 #| echo: false
 
-library(renv)
+library(renv) 
 source('src/functions.R')
+
 
 ```
 
 ```{r}
 #| echo: false
 
-
 # Define parameters for the file paths and other variables
-input_dir <- params$input_dir
+input_dir <- c(#r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\MEH}",
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RFL}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RNOH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\UCLH}"
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\Whittington}"
+               )
 
 submission_month <- params$submission_month
 
+dsn_name <- "SANDPIT_DSN_TEST"
+database_name <- "Data_Lab_NCL_Dev"
+schema_name <- "PeterS"
+table_name <- "turnaround_times_rolltest"
+schema_table_name <- paste(schema_name,table_name,sep = ".")
+#full_table_name <- paste(database_name,schema_name,table_name,sep = ".")
+db_sch_tbl_name <- paste0(database_name,".",schema_name,".",table_name)
+
+# List all files in the input directory. recursive = FALSE doesn't look in subdirectories (e.g. historical/archive folders)
+all_files <- list.files(input_dir, recursive = FALSE, full.names = TRUE, pattern = "*.csv")
+
+# remove GOSH Oct24 due to repeat column names
+all_files <- all_files[all_files != "C:\\Users\\PeterShakeshaft\\OneDrive - NHS\\Turnaround Times\\Provider Submissions\\GOSH/20241024_DIDNCL_RP4_Oct24.csv"]
+all_files <- all_files[all_files != "C:\\Users\\PeterShakeshaft\\OneDrive - NHS\\Turnaround Times\\Provider Submissions\\RFL/20241028_DIDNCL_RAL_Oct24.csv"]
+
+# only read files for selected submission month
+#all_files <- all_files[grep(submission_month, all_files, perl=T)] 
 ```
 
-##Load Provider Data Files
 
-```{r}
-
-# Load provider files into a dataframe
-provider_files <- load_provider_data(input_dir)
-
-```
-
-##Clean and Transform Data
+## Import, assign metadata and cleanse data
 
 ```{r}
 
 # Process the files into a single dataset
-combined_data <- process_provider_files(provider_files)
+
+# function to transform one file
+process_provider_file <- function(file_path) {
+  data <- read_csv(file_path,na = c("NULL","",NULL), show_col_types = FALSE) %>%  # NAs and column types
+  
+    #data <- data[rowSums(is.na(data)) != ncol(data), ]  
+    
+    #data %>% 
+   # clean names
+   janitor::clean_names(case = "snake") %>%
+    
+    # remove entirely blank rows
+    #filter(if_all(everything(), ~ !is.na(.x))) %>% 
+    #filter(data, rowSums(is.na(data)) != ncol(data))
+    
+    # mutate transformations
+    mutate(
+      # metadata
+      file_name = basename(file_path),
+      submission_date = str_extract(file_name, "^\\d{8}"),
+      submission_date = ymd(submission_date),
+      month_year = str_extract(file_name, "[A-Za-z]{3}\\d{2}"),
+      month = str_sub(month_year, 1, 3),
+      year = paste0("20", str_sub(month_year, 4, 5)),
+      submission_month = month(submission_date),
+      submission_year = year(submission_date),
+      data_period = as.Date(paste0("01",month_year), format = "%d%b%y")
+    ) %>%
+    mutate(
+      # data type cleansing
+      diagnostic_test_request_date_time = as.POSIXct(diagnostic_test_request_date_time, format="%d/%m/%Y %H:%M"),
+      diagnostic_test_request_received_date_time = as.POSIXct(diagnostic_test_request_received_date_time, format="%d/%m/%Y %H:%M"),
+      diagnostic_test_date_time = as.POSIXct(diagnostic_test_date_time, format="%d/%m/%Y %H:%M"),
+      service_report_issue_date_time = as.POSIXct(service_report_issue_date_time, format="%d/%m/%Y %H:%M"),
+      patient_source_type = as.integer(patient_source_type),
+      priority_type_code = as.integer(priority_type_code),
+      imaging_code_snomed = as.character(imaging_code_snomed),
+      combined_imaging_code = as.character(ifelse(is.na(imaging_code_nicip),imaging_code_snomed, imaging_code_nicip)),
+      priority_type_code_routine_default = ifelse(is.na(priority_type_code), 1, priority_type_code), # set priority type code to one if don't have - used for target join
+      
+      # output fields
+      TAT_scan = round(interval(diagnostic_test_request_date_time,diagnostic_test_date_time)/hours(1)),
+      TAT_report = round(interval(diagnostic_test_date_time,service_report_issue_date_time)/hours(1)),
+      TAT_overall = round(interval(diagnostic_test_request_date_time,service_report_issue_date_time)/hours(1)),
+      datedifftest = interval(data_period,floor_date(diagnostic_test_date_time, 'month'))/months(1),
+      data_type = case_when(datedifftest == -3 ~ "Freeze",
+                            datedifftest %in% c(-1,-2) ~ "Flex",
+                            .default = "Out of range")
+
+    ) %>% 
+    # select
+    select(submission_date, data_type, month, year, everything())
+  data
+}
+
+# function to process all files
+process_provider_file_list <- function(file_paths) {
+  # apply function for each file
+  data_list <- lapply(file_paths, process_provider_file)
+
+  # combine the results together
+  dplyr::bind_rows(data_list)
+}
+
+# run the function
+combined_data <- process_provider_file_list(all_files) 
 
 ```
 
-##Save the Combined Dataset
+## Establishing a connection to the Sandpit
 
 ```{r}
 
-# Write the combined data to a CSV file
-write_csv(combined_data, paste0('output/', "combined_dataset_", ymd(params$date), ".csv"))
-
-# Output a message
-cat("Processed data saved")
-
-```
-
-##Uploading Combined Dataset to the Sandpit
-
-###Establishing a connection ot the Sandpit
-
-```{r}
-
-# Connecting to the Sandpit
+# Connect to the Sandpit
 
 con <- dbConnect(odbc::odbc(), 
-                 dsn = "SANDPIT",
-                 database = "Data_Lab_NCL",
+                 dsn = dsn_name,
+                 database = database_name,
                  TrustedConnection = TRUE)
 ```
 
-###Uploading the data and transforming according to type
+## Import lookup tables
+
+```{r}
+# lookup_path <- r"{C:\Users\PeterShakeshaft\Documents\Projects\tat_dashboard\data\lookups}"
+# lookup_file_name <- list.files(lookup_path)
+# lookup_full_path <- paste(lookup_path, lookup_file_name, sep = "\\")
+# 
+# # function to read all sheets within an excel file to separate data frames
+# read_excel_allsheets <- function(filename, tibble = FALSE) {
+#   sheets <- readxl::excel_sheets(filename)
+#   x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X)) 
+#   if(!tibble) x <- lapply(x, as.data.frame)
+#   names(x) <- sheets
+#   x <- x %>% janitor::clean_names(case = "snake")
+# }
+# 
+# lookups <- read_excel_allsheets(lookup_full_path)
+# 
+# # turns from list into separate data frames
+# list2env(lookups, envir=.GlobalEnv)
+# 
+# # query to pull organisation lookup table
+# org_query <- "SELECT
+#               Organisation_Code
+#               ,LEFT(Organisation_Code,3) 'Organisation_Trust_Code'
+#               ,Organisation_Name
+#               ,SK_OrganisationTypeID
+#               FROM [Dictionary].[dbo].[Organisation]
+#               where 
+#               SK_OrganisationTypeID IN (41,42)"
+# 
+# lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case = "snake")
+
+
+```
+
+## Wrangle and de-normalise dataset for final output
 
 ```{r}
 
-# Function to replace or append data based on the data type (freeze or flex)
-upload_to_sql <- function(combined_data, con, table_name) {
-  
-  # Split the combined dataset into freeze and flex data
-  freeze_data <- combined_data %>% filter(data_type == "Freeze")
-  flex_data <- combined_data %>% filter(data_type == "Flex")
-  
-  # Replace old flex data with freeze data
-  for (i in seq_len(nrow(freeze_data))) {
-    freeze_row <- freeze_data[i, ]
-    provider_code <- freeze_row$provider_code
-    month <- freeze_row$month
-    year <- freeze_row$year
-    
-    tryCatch({
-      # SQL Query to delete old flex data for the freeze month
-      delete_query <- paste0("DELETE FROM ", table_name, 
-                             " WHERE provider_code = '", provider_code, 
-                             "' AND month = '", month, 
-                             "' AND year = '", year, 
-                             "' AND data_type = 'Flex'")
-      
-      # Execute the delete query
-      dbExecute(con, delete_query)
-      message("Old flex data for ", provider_code, " (", month, " ", year, ") successfully deleted.")
-      
-      # Insert the freeze data into the SQL table
-      dbWriteTable(con, table_name, freeze_row, append = TRUE, row.names = FALSE)
-      message("New freeze data for ", provider_code, " (", month, " ", year, ") successfully uploaded.")
-      
-    }, error = function(e) {
-      warning("Error processing freeze data for ", provider_code, " (", month, " ", year, "): ", e$message)
-    })
-  }
-  
-  # For the flex data, either replace or append
-  for (i in seq_len(nrow(flex_data))) {
-    flex_row <- flex_data[i, ]
-    provider_code <- flex_row$provider_code
-    month <- flex_row$month
-    year <- flex_row$year
-    
-    tryCatch({
-      # SQL Query to check if flex data already exists
-      check_query <- paste0("SELECT COUNT(*) FROM ", table_name, 
-                            " WHERE provider_code = '", provider_code, 
-                            "' AND month = '", month, 
-                            "' AND year = '", year, 
-                            "' AND data_type = 'Flex'")
-      
-      # Execute the query to check existence
-      result <- dbGetQuery(con, check_query)
-      
-      if (result[1, 1] > 0) {
-        # If flex data exists, delete the old flex data
-        delete_query <- paste0("DELETE FROM ", table_name, 
-                               " WHERE provider_code = '", provider_code, 
-                               "' AND month = '", month, 
-                               "' AND year = '", year, 
-                               "' AND data_type = 'Flex'")
-        dbExecute(con, delete_query)
-        message("Existing flex data for ", provider_code, " (", month, " ", year, ") successfully deleted.")
-      }
-      
-      # Insert the new flex data into the SQL table
-      dbWriteTable(con, table_name, flex_row, append = TRUE, row.names = FALSE)
-      message("New flex data for ", provider_code, " (", month, " ", year, ") successfully uploaded.")
-      
-    }, error = function(e) {
-      warning("Error processing flex data for ", provider_code, " (", month, " ", year, "): ", e$message)
-    })
-  }
-}
+# 1. read in lookup tables.
+# 2. do joins
+# 3. do calced fields
+# 4. do selects
+# 
+# wrangled_data <- combined_data %>% 
+#   left_join(lookup_patient_source_setting, by = join_by(patient_source_type == Code)) %>% 
+#   left_join(lookup_combined_image_code, by = join_by(combined_imaging_code == Code)) %>% 
+#   left_join(lookup_targets, by = join_by(priority_type_code_routine_default == Code))
 
-# running the upload process
-tryCatch({
-  con <- connect_to_sql()
-  upload_to_sql(combined_data, con, "your_sql_table_name")
-}, error = function(e) {
-  warning("Error in the upload process: ", e$message)
-}, finally = {
-  if (exists("con") && !is.null(con)) {
-    dbDisconnect(con)
-    message("Disconnected from SQL Server.")
-  }
-})
+# Pare down dataset to just essential columns
+combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
+                                                # diagnostic_test_request_date_time,
+                                                service_report_issue_date_time,
+                                                patient_source_type,
+                                                priority_type_code,
+                                                imaging_code_nicip,
+                                                imaging_code_snomed,
+                                                provider_site_code,
+                                                TAT_scan,
+                                                TAT_report,
+                                                TAT_overall,
+                                                data_type,
+                                                data_period
+                                                )
 
+```
+
+
+## Upload data to sandpit
+
+```{r}
+# Upload using overwrite just to get some data in
+                                                
+# DBI::dbWriteTable(con, DBI::SQL(schema_table_name), combined_data_pared, row.names=F, overwrite = TRUE) # write to new main table
+# print(paste0(db_sch_tbl_name," overwritten with new data"))
+
+```
+
+## Upload data to sandpit - rolling flex/freeze
+
+```{r}
+#1. delete flex data from previous month
+
+
+delete_query <- paste0("DELETE FROM ", schema_table_name,
+                       " WHERE data_type = 'Flex'")
+
+# Execute the delete query
+dbExecute(con, delete_query)
+message("Flex data deleted.")
+
+#2. upload new month
+#submission_month
+#combined_data_pared_month %>% filter(data_period == submission_month)
+#combined_data_pared_month <- combined_data_pared %>% filter(
+DBI::dbWriteTable(con, DBI::SQL(schema_table_name), combined_data_pared, row.names=F, append = TRUE) # write to new main table
+message("Data appended for ", submission_month,"." )
+```
+
+##Uploading the data and transforming according to type
+#everything below this needs fixing - i think.
+
+```{r}
+
+# # Function to replace or append data based on the data type (freeze or flex)
+# upload_to_sql <- function(combined_data, con, full_table_name) {
+#   
+#   # Split the combined dataset into freeze and flex data
+#   freeze_data <- combined_data %>% filter(data_type == "Freeze")
+#   flex_data <- combined_data %>% filter(data_type == "Flex")
+#   
+#   # Replace old flex data with freeze data
+#   for (i in seq_len(nrow(freeze_data))) {
+#     freeze_row <- freeze_data[i, ]
+#     provider_site_code <- freeze_row$provider_site_code
+#     month <- freeze_row$month
+#     year <- freeze_row$year
+#     
+#     tryCatch({
+#       # SQL Query to delete old flex data for the freeze month
+#       delete_query <- paste0("DELETE FROM ", full_table_name, 
+#                              " WHERE provider_site_code = '", provider_site_code, 
+#                              "' AND month = '", month, 
+#                              "' AND year = '", year, 
+#                              "' AND data_type = 'Flex'")
+#       
+#       # Execute the delete query
+#       dbExecute(con, delete_query)
+#       message("Old flex data for ", provider_site_code, " (", month, " ", year, ") successfully deleted.")
+#       
+#       # Insert the freeze data into the SQL table
+#       dbWriteTable(con, full_table_name, freeze_row, append = TRUE, row.names = FALSE)
+#       message("New freeze data for ", provider_site_code, " (", month, " ", year, ") successfully uploaded.")
+#       
+#     }, error = function(e) {
+#       warning("Error processing freeze data for ", provider_site_code, " (", month, " ", year, "): ", e$message)
+#     })
+#   }
+#   
+#   # For the flex data, either replace or append
+#   for (i in seq_len(nrow(flex_data))) {
+#     flex_row <- flex_data[i, ]
+#     provider_site_code <- flex_row$provider_site_code
+#     month <- flex_row$month
+#     year <- flex_row$year
+#     
+#     tryCatch({
+#       # SQL Query to check if flex data already exists
+#       check_query <- paste0("SELECT COUNT(*) FROM ", full_table_name, 
+#                             " WHERE provider_site_code = '", provider_site_code, 
+#                             "' AND month = '", month, 
+#                             "' AND year = '", year, 
+#                             "' AND data_type = 'Flex'")
+#       
+#       # Execute the query to check existence
+#       result <- dbGetQuery(con, check_query)
+#       
+#       if (result[1, 1] > 0) {
+#         # If flex data exists, delete the old flex data
+#         delete_query <- paste0("DELETE FROM ", full_table_name, 
+#                                " WHERE provider_site_code = '", provider_site_code, 
+#                                "' AND month = '", month, 
+#                                "' AND year = '", year, 
+#                                "' AND data_type = 'Flex'")
+#         dbExecute(con, delete_query)
+#         message("Existing flex data for ", provider_site_code, " (", month, " ", year, ") successfully deleted.")
+#       }
+#       
+#       # Insert the new flex data into the SQL table
+#       dbWriteTable(con, full_table_name, flex_row, append = TRUE, row.names = FALSE)
+#       message("New flex data for ", provider_site_code, " (", month, " ", year, ") successfully uploaded.")
+#       
+#     }, error = function(e) {
+#       warning("Error processing flex data for ", provider_site_code, " (", month, " ", year, "): ", e$message)
+#     })
+#   }
+# }
+# 
+# # running the upload process
+# tryCatch({
+#   #con <- connect_to_sql()
+#   upload_to_sql(combined_data, con, schema_table_name)
+# }, error = function(e) {
+#   warning("Error in the upload process: ", e$message)
+# }, finally = {
+#   if (exists("con") && !is.null(con)) {
+#     dbDisconnect(con)
+#     message("Disconnected from SQL Server.")
+#   }
+# })
+# 
 
 ```
