@@ -1,6 +1,7 @@
 SELECT
-d.provider_site_code
-,diagnostic_test_date_time 'DiagnosticTestDateTime'
+--d.provider_site_code
+--,
+diagnostic_test_date_time 'DiagnosticTestDateTime'
 --,diagnostic_test_request_date_and_time
 --,service_report_issue_date_and_time
 --,patient_source_setting
@@ -116,5 +117,3 @@ LEFT JOIN [Data_Lab_NCL_Dev].[PeterS].[tat_lookup_modality] m ON mi.Modality = m
 LEFT JOIN [Dictionary].[dbo].[Organisation] st ON d.provider_site_code = st.Organisation_Code
 LEFT JOIN [Dictionary].[dbo].[Organisation] prv ON LEFT(d.provider_site_code,3) = prv.Organisation_Code
 LEFT JOIN [Data_Lab_NCL_Dev].[PeterS].[tat_lookup_priority_type] pt ON d.priority_type_code = pt.Code
-WHERE 
-provider_site_code IS NULL
