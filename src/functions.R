@@ -44,7 +44,7 @@ process_provider_file <- function(file_path) {
       imaging_code_snomed = as.character(imaging_code_snomed),
       combined_imaging_code = as.character(ifelse(is.na(imaging_code_nicip),imaging_code_snomed, imaging_code_nicip)),
       priority_type_code_routine_default = ifelse(is.na(priority_type_code), 1, priority_type_code), # set priority type code to one if don't have - used for target join
-      
+      trust_code = substr(provider_site_code, 1, 3),
       # output fields
       TAT_scan = round(interval(diagnostic_test_request_date_time,diagnostic_test_date_time)/hours(1)),
       TAT_report = round(interval(diagnostic_test_date_time,service_report_issue_date_time)/hours(1)),
@@ -55,7 +55,18 @@ process_provider_file <- function(file_path) {
                             .default = "Out of range")
       
     ) %>% 
+    #filter out out-of-range dates
+    filter(data_type != "Out of range") %>% 
     # select
     select(submission_date, data_type, month, year, everything())
   data
+}
+
+# function to read all sheets within an excel file to separate data frames
+read_excel_allsheets <- function(filename, tibble = FALSE) {
+  sheets <- readxl::excel_sheets(filename)
+  x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+  if(!tibble) x <- lapply(x, as.data.frame)
+  names(x) <- sheets
+  x <- x %>% janitor::clean_names(case = "snake") # cleans data frame names
 }

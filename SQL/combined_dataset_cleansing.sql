@@ -17,7 +17,7 @@ diagnostic_test_date_time 'DiagnosticTestDateTime'
 	 WHEN d.provider_site_code = 'RAL26' THEN 'RFL - Barnet Hospital'
 	 WHEN d.provider_site_code = 'RALWH' THEN 'RFL - Whittington Hospital'
 	 WHEN d.provider_site_code = 'F0U9Q' THEN 'RFL - Finchley Memorial Hospital CDC'
-	 WHEN LEFT(d.provider_site_code,3) = 'RAL' THEN 'RFL - Others'
+	 WHEN LEFT(d.provider_site_code,3) = 'RAL' THEN 'c'
 	 ELSE st.Organisation_Name
 	 END AS 'SiteName'
 ,CASE 
@@ -28,59 +28,61 @@ diagnostic_test_date_time 'DiagnosticTestDateTime'
 	END AS 'ProviderTrust'
 --,priority_type_code
 ,pt.[Description] 'PriorityTypeCode'
-,CASE WHEN priority_type_code = 3 THEN 1 WHEN priority_type_code IN (1,2) THEN 0 ELSE NULL END AS 'CancerPathwayFlag'
+--,CASE WHEN priority_type_code = 3 THEN 1 WHEN priority_type_code IN (1,2) THEN 0 ELSE NULL END AS 'CancerPathwayFlag'
+,cancer_pathway_flag AS 'CancerPathwayFlag'
 --,data_type
 ,CASE 
 	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(7*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
 	THEN 1
+
 	WHEN d.TAT_scan > t.[NCL Scan Target (hours)]
 	THEN 1
 	ELSE 0 END AS 'BreachScan'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(5*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(5*24 <  t.[NCL Scan Target (hours)], 5*24,  t.[NCL Scan Target (hours)])
 	THEN 1
 	WHEN d.TAT_scan > t.[NCL Scan Target (hours)]
 	THEN 1
 	ELSE 0 END AS 'BreachScan7Day'
 ,d.TAT_Scan 'TATScan'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(3*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_report > IIF(3*24 <  t.[NCL Report Target (hours)], 3*24,  t.[NCL Report Target (hours)])
 	THEN 1
 	WHEN d.TAT_Report > t.[NCL Report Target (hours)]
 	THEN 1
 	ELSE 0 END AS 'BreachReportNCL'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(2*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_report > IIF(2*24 <  t.[NCL Report Target (hours)], 2*24,  t.[NCL Report Target (hours)])
 	THEN 1
 	WHEN d.TAT_Report > t.[NCL Report Target (hours)]
 	THEN 1
 	ELSE 0 END AS  'BreachReportNCLCancer7Day'
 ,CASE 
-	WHEN t.[NCL Report Target (hours)] > 4*7*24 
+	WHEN d.TAT_Report > 4*7*24 
 	THEN 1 
 	ELSE 0 
 	END AS 'BreachReport4Week'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(3*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_report > IIF(3*24 <  t.[NCL Report Target (hours)], 3*24,  t.[NCL Report Target (hours)])
 	THEN 1
 	WHEN d.TAT_Report > t.[NHSE Report TAT Target (hours)]
 	THEN 1
 	ELSE 0 END AS 'BreachReportNHSE'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_scan > IIF(2*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_report > IIF(2*24 <  t.[NCL Report Target (hours)], 2*24,  t.[NCL Report Target (hours)])
 	THEN 1
 	WHEN d.TAT_Report > t.[NHSE Report TAT Target (hours)]
 	THEN 1
 	ELSE 0 END AS 'BreachReportNHSECancer7Day'
 ,d.TAT_Report 'TATReport'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_overall > IIF(10*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_overall > IIF(10*24 <  t.[NCL Overall Target (hours)], 10*24,  t.[NCL Overall Target (hours)])
 	THEN 1
 	WHEN TAT_overall > t.[NCL Overall TAT Target (hours)]
 	THEN 1
 	ELSE 0 END AS 'BreachOverall'
 ,CASE 
-	WHEN priority_type_code = 3 AND d.TAT_overall > IIF(7*24 <  t.[NCL Scan Target (hours)], 7*24,  t.[NCL Scan Target (hours)])
+	WHEN priority_type_code = 3 AND d.TAT_overall > IIF(7*24 <  t.[NCL Overall Target (hours)], 7*24,  t.[NCL Overall Target (hours)])
 	THEN 1
 	WHEN d.TAT_overall > t.[NCL Overall TAT Target (hours)]
 	THEN 1

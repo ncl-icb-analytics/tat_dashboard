@@ -24,7 +24,7 @@ source('src/functions.R')
 #| echo: false
 
 # Define parameters for the file paths and other variables
-input_dir <- c(#r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH}",
+input_dir <- c(r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\MEH}",
                #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RFL}",
@@ -38,7 +38,7 @@ submission_month <- params$submission_month
 dsn_name <- "SANDPIT_DSN_TEST"
 database_name <- "Data_Lab_NCL_Dev"
 schema_name <- "PeterS"
-table_name <- "turnaround_times_ROLLTEST"
+table_name <- "turnaround_times"
 schema_table_name <- paste(schema_name,table_name,sep = ".")
 #full_table_name <- paste(database_name,schema_name,table_name,sep = ".")
 db_sch_tbl_name <- paste0(database_name,".",schema_name,".",table_name)
@@ -55,10 +55,25 @@ all_files <- all_files[grep(submission_month, all_files, perl=T)]
 
 ```{r}
 
-# Process the files into a single dataset
-
-# apply function to list of files
+# apply processing function to list of files to form single dataset
 combined_data <- map_dfr(all_files, process_provider_file)
+
+## Pare down dataset to just essential columns - for if denormalising in SQL
+combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
+                                                # diagnostic_test_request_date_time,
+                                                service_report_issue_date_time,
+                                                patient_source_type,
+                                                priority_type_code,
+                                                imaging_code_nicip,
+                                                imaging_code_snomed,
+                                                provider_site_code,
+                                                TAT_scan,
+                                                TAT_report,
+                                                TAT_overall,
+                                                data_type,
+                                                data_period,
+                                                cancer_pathway_flag
+                                                )
 
 ```
 
@@ -77,35 +92,30 @@ con <- dbConnect(odbc::odbc(),
 ## Import lookup tables
 
 ```{r}
-# lookup_path <- r"{C:\Users\PeterShakeshaft\Documents\Projects\tat_dashboard\data\lookups}"
-# lookup_file_name <- list.files(lookup_path)
-# lookup_full_path <- paste(lookup_path, lookup_file_name, sep = "\\")
-# 
-# # function to read all sheets within an excel file to separate data frames
-# read_excel_allsheets <- function(filename, tibble = FALSE) {
-#   sheets <- readxl::excel_sheets(filename)
-#   x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X)) 
-#   if(!tibble) x <- lapply(x, as.data.frame)
-#   names(x) <- sheets
-#   x <- x %>% janitor::clean_names(case = "snake")
-# }
-# 
-# lookups <- read_excel_allsheets(lookup_full_path)
-# 
-# # turns from list into separate data frames
-# list2env(lookups, envir=.GlobalEnv)
-# 
-# # query to pull organisation lookup table
-# org_query <- "SELECT
-#               Organisation_Code
-#               ,LEFT(Organisation_Code,3) 'Organisation_Trust_Code'
-#               ,Organisation_Name
-#               ,SK_OrganisationTypeID
-#               FROM [Dictionary].[dbo].[Organisation]
-#               where 
-#               SK_OrganisationTypeID IN (41,42)"
-# 
-# lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case = "snake")
+lookup_path <- "docs/lookups"
+lookup_file_name <- list.files(lookup_path)
+lookup_full_path <- paste(lookup_path, lookup_file_name, sep = "\\")
+
+# run function to read lookup tables
+lookups <- read_excel_allsheets(lookup_full_path)
+
+# clean column names of lookup tables
+lookups <- lapply(lookups, janitor::clean_names)
+
+# turns from list of data frames into separate data frames
+list2env(lookups, envir=.GlobalEnv)
+
+# query to pull organisation lookup table
+org_query <- "SELECT
+              Organisation_Code
+              ,LEFT(Organisation_Code,3) 'Organisation_Trust_Code'
+              ,Organisation_Name
+              ,SK_OrganisationTypeID
+              FROM [Dictionary].[dbo].[Organisation]
+              where
+              SK_OrganisationTypeID IN (41,42)"
+
+lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case = "snake")
 
 
 ```
@@ -114,42 +124,131 @@ con <- dbConnect(odbc::odbc(),
 
 ```{r}
 
-# 1. read in lookup tables.
-# 2. do joins
-# 3. do calced fields
-# 4. do selects
+# 1. do a pre-select to drop metadata etc
+# 4. final select
+
+wrangled_data <- combined_data %>%
+  # pre-select so not processing unnecesary columns
+  select(diagnostic_test_date_time,
+         service_report_issue_date_time,
+         patient_source_type,
+         priority_type_code,
+         priority_type_code_routine_default,
+         combined_imaging_code,
+         provider_site_code,
+         trust_code,
+         TAT_scan,
+         TAT_report,
+         TAT_overall,
+         data_type,
+         data_period,
+         cancer_pathway_flag) %>%
+  # join the lookup tables
+  left_join(lookup_patient_source_setting, by = join_by(patient_source_type == code)) %>%
+  left_join(lookup_combined_image_code, by = join_by(combined_imaging_code == code)) %>%
+  left_join(lookup_targets, by = join_by(priority_type_code_routine_default == priority_type, 
+                                         patient_source_type == patient_source_setting, 
+                                         modality == imaging_service_split)) %>% 
+  left_join(lookup_modality, by = join_by(modality == modality_intermediate_derived_from_nicip_snomed)) %>% 
+  left_join(lookup_organisation, by = join_by(provider_site_code == organisation_code)) %>% 
+  left_join(lookup_organisation, by = join_by(trust_code == organisation_code)) %>% 
+  left_join(lookup_priority_type, by = join_by(priority_type_code == code)) %>% 
+  #mutates here to do calculated field, provider groupings etc
+  mutate(SiteName = case_when(provider_site_code == "RALC7" ~ "RFL - Chase Farm Hospital", # throws an error. cant use case_when()? need to do a calced column first i expect.
+                              provider_site_code == "RAL01" ~ "RFL - Royal Free Hospital",
+                              provider_site_code == "RALRA" ~ "RFL - Edgware Community Hospital",
+                              provider_site_code == "RAL26" ~ "RFL - Barnet Hospital",
+                              provider_site_code == "RALWH" ~ "RFL - Whittington Hospital",
+                              provider_site_code == "F0U9Q" ~ "RFL - Finchley Memorial Hospital CDC",
+                              trust_code == "RAL" ~ "RFL - Finchley Memorial Hospital CDC",
+                              .default = organisation_name.x),
+         ProviderTrust = case_when(provider_site_code == "F0U9Q" ~ "Royal Free London NHS Foundation Trust", # would be good to have this less hard coded. need to join parent org
+                                   provider_site_code == "C4M4J" ~ "University College London Hospitals NHS Foundation Trust",
+                                   provider_site_code == "P5B6O" ~ "Whittington Health NHS Trust",
+                                   .default = organisation_name.y),
+         # CancerPathwayFlag = case_when(priority_type_code == 3 ~ 1, # only using this for target logic. use provider submitted otherwise.
+         #                               priority_type_code %in% c(2,1) ~ 0,
+         #                               .default = NA)
+         BreachScan = case_when(priority_type_code == 3 & TAT_scan > min(7*24, ncl_scan_target_hours) ~ 1,
+                                TAT_scan > ncl_scan_target_hours ~ 1,
+                                TAT_scan <= ncl_scan_target_hours ~0,
+                                .default = NA),
+         BreachScan7Day = case_when(priority_type_code == 3 & TAT_scan > min(5*24, ncl_scan_target_hours) ~ 1,
+                                    TAT_scan > ncl_scan_target_hours ~ 1,
+                                    TAT_scan <= ncl_scan_target_hours ~0,
+                                    .default = NA),
+         BreachReportNCL = case_when(priority_type_code == 3 & TAT_report > min(3*24, ncl_report_target_hours) ~ 1,
+                                     TAT_report > ncl_report_target_hours ~ 1,
+                                     TAT_report <= ncl_report_target_hours ~0,
+                                     .default = NA),
+         BreachReportNCLCancer7Day = case_when(priority_type_code == 3 & TAT_report > min(2*24, ncl_report_target_hours) ~ 1,
+                                               TAT_report > ncl_report_target_hours ~ 1,
+                                               TAT_report <= ncl_report_target_hours ~0,
+                                               .default = NA),
+         BreachReport4Week = case_when(TAT_report > 4*24*7 ~ 1,
+                                       TAT_report <= 4*24*7 ~0,
+                                       .default = NA),
+         BreachReportNHSE = case_when(priority_type_code == 3 & TAT_report > min(3*24, ncl_report_target_hours) ~ 1,
+                                      TAT_report > ncl_report_target_hours ~ 1,
+                                      TAT_report <= ncl_report_target_hours ~0,
+                                      .default = NA),
+         BreachReportNHSECancer7Day = case_when(priority_type_code == 3 & TAT_report > min(2*24, ncl_report_target_hours) ~ 1,
+                                                TAT_report > ncl_report_target_hours ~ 1,
+                                                TAT_report <= ncl_report_target_hours ~0,
+                                                .default = NA),
+         BreachOverall = case_when(priority_type_code == 3 & TAT_overall > min(10*24, ncl_overall_tat_target_hours) ~ 1,
+                                   TAT_overall > ncl_overall_tat_target_hours ~ 1,
+                                   TAT_overall <= ncl_overall_tat_target_hours ~0,
+                                   .default = NA),
+         BreachOverallCancer7Day = case_when(priority_type_code == 3 & TAT_overall > min(7*24, ncl_overall_tat_target_hours) ~ 1,
+                                             TAT_overall > ncl_overall_tat_target_hours ~ 1,
+                                             TAT_overall <= ncl_overall_tat_target_hours ~0,
+                                             .default = NA),
+         TestAwaitingReport = case_when(is.na(service_report_issue_date_time) == TRUE & data_type == "Flex" ~ 1,
+                                        .default = 0),
+         TestUnreported = case_when(is.na(service_report_issue_date_time) == TRUE & data_type == "Freeze" ~ 1,
+                                    .default = 0),
+         
+  ) %>% 
+  # Final select for output
+  select(DiagnosticTestDateTime = diagnostic_test_date_time,
+         PatientSourceTypeName = patient_source_setting,
+         Modality = modality.y,
+         SiteName,
+         ProviderTrust,
+         PriorityTypeCode = description,
+         CancerPathwayFlag = cancer_pathway_flag,
+         BreachScan,
+         BreachScan7Day,
+         TATScan = TAT_scan,
+         BreachReportNCL,
+         BreachReportNCLCancer7Day,
+         BreachReport4Week,
+         BreachReportNHSE,
+         BreachReportNHSECancer7Day,
+         TATReport = TAT_report,
+         BreachOverall,
+         BreachOverallCancer7Day,
+         TATOverall = TAT_overall,
+         TestAwaitingReport,
+         TestUnreported,
+         DataType = data_type
+  )
 # 
-# wrangled_data <- combined_data %>% 
-#   left_join(lookup_patient_source_setting, by = join_by(patient_source_type == Code)) %>% 
-#   left_join(lookup_combined_image_code, by = join_by(combined_imaging_code == Code)) %>% 
-#   left_join(lookup_targets, by = join_by(priority_type_code_routine_default == Code))
+# 
+#          
+#   )
+#                               
 
-# Pare down dataset to just essential columns
-combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
-                                                # diagnostic_test_request_date_time,
-                                                service_report_issue_date_time,
-                                                patient_source_type,
-                                                priority_type_code,
-                                                imaging_code_nicip,
-                                                imaging_code_snomed,
-                                                provider_site_code,
-                                                TAT_scan,
-                                                TAT_report,
-                                                TAT_overall,
-                                                data_type,
-                                                data_period
-                                                )
-
-#View(combined_data %>% filter(is.na(diagnostic_test_date_time)))
 ```
 
 
-## Upload data to sandpit
+## Upload data to sandpit (basic bulk upload)
 
 ```{r}
 # Upload using overwrite just to get some data in
-                                                
-# DBI::dbWriteTable(con, DBI::SQL(schema_table_name), combined_data_pared, row.names=F, overwrite = TRUE) # write to new main table
+
+# DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, overwrite = TRUE) # write to new main table
 # print(paste0(db_sch_tbl_name," overwritten with new data"))
 
 ```
@@ -160,14 +259,14 @@ combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
 #1. delete flex data from previous month
 
 delete_query <- paste0("DELETE FROM ", schema_table_name,
-                       " WHERE data_type = 'Flex'")
+                       " WHERE DataType = 'Flex'")
 
 # Execute the delete query
 dbExecute(con, delete_query)
 message("Flex data deleted.")
 
 #2. upload new month
-DBI::dbWriteTable(con, DBI::SQL(schema_table_name), combined_data_pared, row.names=F, append = TRUE) # write to new main table
+DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
 message("Data appended for ", submission_month,"." )
 ```
 

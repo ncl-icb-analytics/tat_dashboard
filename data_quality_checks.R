@@ -1,12 +1,6 @@
 library(daiquiri)
 
-# run query
 start_time = Sys.time()
-# dids <- dbGetQuery(con, query)
-end_time = Sys.time()
-end_time - start_time
-
-lapply(combined_data_pared, class)
 
 fts <- field_types(
   diagnostic_test_date_time = ft_timepoint(includes_time = TRUE), # , format = "%Y-%m-%d"
@@ -24,8 +18,12 @@ fts <- field_types(
 )
 
 
-# create a report in the current directory
+# create a report in the output directory
 daiq_obj <- daiquiri_report(
   combined_data_pared,
-  field_types = fts
+  field_types = fts,
+  save_directory = "output/daiquiri"
 )
+
+end_time = Sys.time()
+end_time - start_time
