@@ -169,45 +169,45 @@ wrangled_data <- combined_data %>%
          # CancerPathwayFlag = case_when(priority_type_code == 3 ~ 1, # only using this for target logic. use provider submitted otherwise.
          #                               priority_type_code %in% c(2,1) ~ 0,
          #                               .default = NA)
-         BreachScan = case_when(priority_type_code == 3 & TAT_scan > min(7*24, ncl_scan_target_hours) ~ 1,
+         BreachScan = case_when(priority_type_code == 3 & TAT_scan > pmin(7*24, ncl_scan_target_hours) ~ 1,
                                 TAT_scan > ncl_scan_target_hours ~ 1,
                                 TAT_scan <= ncl_scan_target_hours ~0,
                                 .default = NA),
-         BreachScan7Day = case_when(priority_type_code == 3 & TAT_scan > min(5*24, ncl_scan_target_hours) ~ 1,
+         BreachScan7Day = case_when(priority_type_code == 3 & TAT_scan > pmin(5*24, ncl_scan_target_hours) ~ 1,
                                     TAT_scan > ncl_scan_target_hours ~ 1,
                                     TAT_scan <= ncl_scan_target_hours ~0,
                                     .default = NA),
-         BreachReportNCL = case_when(priority_type_code == 3 & TAT_report > min(3*24, ncl_report_target_hours) ~ 1,
+         BreachReportNCL = case_when(priority_type_code == 3 & TAT_report > pmin(3*24, ncl_report_target_hours) ~ 1,
                                      TAT_report > ncl_report_target_hours ~ 1,
                                      TAT_report <= ncl_report_target_hours ~0,
                                      .default = NA),
-         BreachReportNCLCancer7Day = case_when(priority_type_code == 3 & TAT_report > min(2*24, ncl_report_target_hours) ~ 1,
+         BreachReportNCLCancer7Day = case_when(priority_type_code == 3 & TAT_report > pmin(2*24, ncl_report_target_hours) ~ 1,
                                                TAT_report > ncl_report_target_hours ~ 1,
                                                TAT_report <= ncl_report_target_hours ~0,
                                                .default = NA),
          BreachReport4Week = case_when(TAT_report > 4*24*7 ~ 1,
                                        TAT_report <= 4*24*7 ~0,
                                        .default = NA),
-         BreachReportNHSE = case_when(priority_type_code == 3 & TAT_report > min(3*24, nhse_report_tat_target_hours) ~ 1,
+         BreachReportNHSE = case_when(priority_type_code == 3 & TAT_report > pmin(3*24, nhse_report_tat_target_hours) ~ 1,
                                       TAT_report > nhse_report_tat_target_hours ~ 1,
                                       TAT_report <= nhse_report_tat_target_hours ~0,
                                       .default = NA),
-         BreachReportNHSECancer7Day = case_when(priority_type_code == 3 & TAT_report > min(2*24, nhse_report_tat_target_hours) ~ 1,
+         BreachReportNHSECancer7Day = case_when(priority_type_code == 3 & TAT_report > pmin(2*24, nhse_report_tat_target_hours) ~ 1,
                                                 TAT_report > nhse_report_tat_target_hours ~ 1,
                                                 TAT_report <= nhse_report_tat_target_hours ~0,
                                                 .default = NA),
-         BreachOverall = case_when(priority_type_code == 3 & TAT_overall > min(10*24, ncl_overall_tat_target_hours) ~ 1,
+         BreachOverall = case_when(priority_type_code == 3 & TAT_overall > pmin(10*24, ncl_overall_tat_target_hours) ~ 1,
                                    TAT_overall > ncl_overall_tat_target_hours ~ 1,
                                    TAT_overall <= ncl_overall_tat_target_hours ~0,
                                    .default = NA),
-         BreachOverallCancer7Day = case_when(priority_type_code == 3 & TAT_overall > min(7*24, ncl_overall_tat_target_hours) ~ 1,
+         BreachOverallCancer7Day = case_when(priority_type_code == 3 & TAT_overall > pmin(7*24, ncl_overall_tat_target_hours) ~ 1,
                                              TAT_overall > ncl_overall_tat_target_hours ~ 1,
                                              TAT_overall <= ncl_overall_tat_target_hours ~0,
                                              .default = NA),
          TestAwaitingReport = case_when(is.na(service_report_issue_date_time) == TRUE & data_type == "Flex" ~ 1,
                                         .default = 0),
          TestUnreported = case_when(is.na(service_report_issue_date_time) == TRUE & data_type == "Freeze" ~ 1,
-                                    .default = 0),
+                                    .default = 0)
          
   ) %>% 
   # Final select for output
@@ -234,6 +234,7 @@ wrangled_data <- combined_data %>%
          TestUnreported,
          DataType = data_type
   )
+
 ```
 
 
