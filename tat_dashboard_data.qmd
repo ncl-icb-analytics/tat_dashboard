@@ -1,6 +1,6 @@
 ---
 title: "tat_dashboard_data"
-author: c("Arush Mohan", "Peter Shakeshaft")
+author: "Arush Mohan, Peter Shakeshaft"
 date: "`r Sys.Date()`"
 params:
   #input_dir: "data/providers"  # Path to the directory where provider folders are stored
@@ -188,13 +188,13 @@ wrangled_data <- combined_data %>%
          BreachReport4Week = case_when(TAT_report > 4*24*7 ~ 1,
                                        TAT_report <= 4*24*7 ~0,
                                        .default = NA),
-         BreachReportNHSE = case_when(priority_type_code == 3 & TAT_report > min(3*24, ncl_report_target_hours) ~ 1,
-                                      TAT_report > ncl_report_target_hours ~ 1,
-                                      TAT_report <= ncl_report_target_hours ~0,
+         BreachReportNHSE = case_when(priority_type_code == 3 & TAT_report > min(3*24, nhse_report_tat_target_hours) ~ 1,
+                                      TAT_report > nhse_report_tat_target_hours ~ 1,
+                                      TAT_report <= nhse_report_tat_target_hours ~0,
                                       .default = NA),
-         BreachReportNHSECancer7Day = case_when(priority_type_code == 3 & TAT_report > min(2*24, ncl_report_target_hours) ~ 1,
-                                                TAT_report > ncl_report_target_hours ~ 1,
-                                                TAT_report <= ncl_report_target_hours ~0,
+         BreachReportNHSECancer7Day = case_when(priority_type_code == 3 & TAT_report > min(2*24, nhse_report_tat_target_hours) ~ 1,
+                                                TAT_report > nhse_report_tat_target_hours ~ 1,
+                                                TAT_report <= nhse_report_tat_target_hours ~0,
                                                 .default = NA),
          BreachOverall = case_when(priority_type_code == 3 & TAT_overall > min(10*24, ncl_overall_tat_target_hours) ~ 1,
                                    TAT_overall > ncl_overall_tat_target_hours ~ 1,
@@ -234,12 +234,6 @@ wrangled_data <- combined_data %>%
          TestUnreported,
          DataType = data_type
   )
-# 
-# 
-#          
-#   )
-#                               
-
 ```
 
 
