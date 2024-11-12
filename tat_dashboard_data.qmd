@@ -26,7 +26,7 @@ source('src/functions.R')
 # Define parameters for the file paths and other variables
 input_dir <- c(r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\MEH}",
-               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RFL}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RNOH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\UCLH}"
@@ -77,18 +77,6 @@ combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
 
 ```
 
-## Establishing a connection to the Sandpit
-
-```{r}
-
-# Connect to the Sandpit
-
-con <- dbConnect(odbc::odbc(), 
-                 dsn = dsn_name,
-                 database = database_name,
-                 TrustedConnection = TRUE)
-```
-
 ## Import lookup tables
 
 ```{r}
@@ -105,17 +93,17 @@ lookups <- lapply(lookups, janitor::clean_names)
 # turns from list of data frames into separate data frames
 list2env(lookups, envir=.GlobalEnv)
 
-# query to pull organisation lookup table
-org_query <- "SELECT
-              Organisation_Code
-              ,LEFT(Organisation_Code,3) 'Organisation_Trust_Code'
-              ,Organisation_Name
-              ,SK_OrganisationTypeID
-              FROM [Dictionary].[dbo].[Organisation]
-              where
-              SK_OrganisationTypeID IN (41,42)"
-
-lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case = "snake")
+# # query to pull organisation lookup table
+# org_query <- "SELECT
+#               Organisation_Code
+#               ,LEFT(Organisation_Code,3) 'Organisation_Trust_Code'
+#               ,Organisation_Name
+#               ,SK_OrganisationTypeID
+#               FROM [Dictionary].[dbo].[Organisation]
+#               where
+#               SK_OrganisationTypeID IN (41,42)"
+# 
+# lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case = "snake")
 
 
 ```
@@ -123,9 +111,6 @@ lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case 
 ## Wrangle and de-normalise dataset for final output
 
 ```{r}
-
-# 1. do a pre-select to drop metadata etc
-# 4. final select
 
 wrangled_data <- combined_data %>%
   # pre-select so not processing unnecesary columns
@@ -150,25 +135,12 @@ wrangled_data <- combined_data %>%
                                          patient_source_type == patient_source_setting, 
                                          modality == imaging_service_split)) %>% 
   left_join(lookup_modality, by = join_by(modality == modality_intermediate_derived_from_nicip_snomed)) %>% 
-  left_join(lookup_organisation, by = join_by(provider_site_code == organisation_code)) %>% 
-  left_join(lookup_organisation, by = join_by(trust_code == organisation_code)) %>% 
   left_join(lookup_priority_type, by = join_by(priority_type_code == code)) %>% 
+  left_join(lookup_trusts, by = join_by(trust_code == trust_code)) %>%
+  left_join(lookup_sites, by = join_by(provider_site_code == site_code)) %>%
+  left_join(lookup_sitegroups, by = join_by(site_group_id == site_group_id)) %>%
   #mutates here to do calculated field, provider groupings etc
-  mutate(SiteName = case_when(provider_site_code == "RALC7" ~ "RFL - Chase Farm Hospital", # throws an error. cant use case_when()? need to do a calced column first i expect.
-                              provider_site_code == "RAL01" ~ "RFL - Royal Free Hospital",
-                              provider_site_code == "RALRA" ~ "RFL - Edgware Community Hospital",
-                              provider_site_code == "RAL26" ~ "RFL - Barnet Hospital",
-                              provider_site_code == "RALWH" ~ "RFL - Whittington Hospital",
-                              provider_site_code == "F0U9Q" ~ "RFL - Finchley Memorial Hospital CDC",
-                              trust_code == "RAL" ~ "RFL - Finchley Memorial Hospital CDC",
-                              .default = organisation_name.x),
-         ProviderTrust = case_when(provider_site_code == "F0U9Q" ~ "Royal Free London NHS Foundation Trust", # would be good to have this less hard coded. need to join parent org
-                                   provider_site_code == "C4M4J" ~ "University College London Hospitals NHS Foundation Trust",
-                                   provider_site_code == "P5B6O" ~ "Whittington Health NHS Trust",
-                                   .default = organisation_name.y),
-         # CancerPathwayFlag = case_when(priority_type_code == 3 ~ 1, # only using this for target logic. use provider submitted otherwise.
-         #                               priority_type_code %in% c(2,1) ~ 0,
-         #                               .default = NA)
+  mutate(
          BreachScan = case_when(priority_type_code == 3 & TAT_scan > pmin(7*24, ncl_scan_target_hours) ~ 1,
                                 TAT_scan > ncl_scan_target_hours ~ 1,
                                 TAT_scan <= ncl_scan_target_hours ~0,
@@ -207,15 +179,25 @@ wrangled_data <- combined_data %>%
          TestAwaitingReport = case_when(is.na(service_report_issue_date_time) == TRUE & data_type == "Flex" ~ 1,
                                         .default = 0),
          TestUnreported = case_when(is.na(service_report_issue_date_time) == TRUE & data_type == "Freeze" ~ 1,
-                                    .default = 0)
+                                    .default = 0),
+         # set NA values to "unclassified"
+         patient_source_setting = replace_na(patient_source_setting, "Unclassified"),
+         modality.y = replace_na(modality.y, "Unclassified"),
+         description = replace_na(description, "Unclassified"), # PriorityTypeCode
+         replace_na(site_group_long, "Unclassified"),
+         replace_na(site_group_short, "Unclassified"),
+         replace_na(trust_long, "Unclassified"),
+         replace_na(trust_short, "Unclassified")
          
   ) %>% 
   # Final select for output
   select(DiagnosticTestDateTime = diagnostic_test_date_time,
          PatientSourceTypeName = patient_source_setting,
          Modality = modality.y,
-         SiteName,
-         ProviderTrust,
+         SiteName = site_group_long,
+         SiteNameShort = site_group_short,
+         ProviderTrust = trust_long,
+         ProviderTrustShort = trust_short,
          PriorityTypeCode = description,
          CancerPathwayFlag = cancer_pathway_flag,
          BreachScan,
@@ -235,14 +217,31 @@ wrangled_data <- combined_data %>%
          DataType = data_type
   )
 
+# View(wrangled_data %>% filter(is.na(SiteNameLong) == TRUE))
+# View(wrangled_data %>% filter(ProviderTrustShort == "Unclassified"))
+# View(wrangled_data %>% filter(Modality == "Unclassified"))
+# View(combined_data %>% filter(provider_site_code == "F0U9Q"))
+#View(combined_data %>% filter(is.na(patient_source_type) == TRUE))
+
 ```
 
-
-## Upload data to sandpit (basic bulk upload)
+## Establishing a connection to the Sandpit
 
 ```{r}
-# Upload using overwrite just to get some data in
 
+# Connect to the Sandpit
+
+con <- dbConnect(odbc::odbc(), 
+                 dsn = dsn_name,
+                 database = database_name,
+                 TrustedConnection = TRUE)
+```
+
+## Upload data to sandpit (basic bulk upload or setting new columns)
+
+```{r}
+# # Upload using overwrite just to get some data in
+# 
 # DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, overwrite = TRUE) # write to new main table
 # print(paste0(db_sch_tbl_name," overwritten with new data"))
 
@@ -251,7 +250,7 @@ wrangled_data <- combined_data %>%
 ## Upload data to sandpit - rolling flex/freeze
 
 ```{r}
-#1. delete flex data from previous month
+# #1. delete flex data from previous month
 
 delete_query <- paste0("DELETE FROM ", schema_table_name,
                        " WHERE DataType = 'Flex'")
