@@ -28,9 +28,9 @@ input_dir <- c(r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provi
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\MEH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}",
                r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RFL}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RNOH}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\UCLH}"
-               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\Whittington}"
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RNOH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\UCLH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\Whittington}"
                )
 
 submission_month <- params$submission_month
@@ -40,7 +40,6 @@ database_name <- "Data_Lab_NCL_Dev"
 schema_name <- "PeterS"
 table_name <- "turnaround_times"
 schema_table_name <- paste(schema_name,table_name,sep = ".")
-#full_table_name <- paste(database_name,schema_name,table_name,sep = ".")
 db_sch_tbl_name <- paste0(database_name,".",schema_name,".",table_name)
 
 # List all files in the input directory. recursive = FALSE doesn't look in subdirectories (e.g. historical/archive folders)
@@ -59,21 +58,23 @@ all_files <- all_files[grep(submission_month, all_files, perl=T)]
 combined_data <- map_dfr(all_files, process_provider_file)
 
 ## Pare down dataset to just essential columns - for if denormalising in SQL
-combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
-                                                # diagnostic_test_request_date_time,
-                                                service_report_issue_date_time,
-                                                patient_source_type,
-                                                priority_type_code,
-                                                imaging_code_nicip,
-                                                imaging_code_snomed,
-                                                provider_site_code,
-                                                TAT_scan,
-                                                TAT_report,
-                                                TAT_overall,
-                                                data_type,
-                                                data_period,
-                                                cancer_pathway_flag
-                                                )
+# combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
+#                                                 # diagnostic_test_request_date_time,
+#                                                 service_report_issue_date_time,
+#                                                 patient_source_type,
+#                                                 priority_type_code,
+#                                                 imaging_code_nicip,
+#                                                 imaging_code_snomed,
+#                                                 trust_code,
+#                                                 provider_site_code,
+#                                                 TAT_scan,
+#                                                 TAT_report,
+#                                                 TAT_overall,
+#                                                 data_type,
+#                                                 data_period,
+#                                                 month_year,
+#                                                 cancer_pathway_flag
+#                                                 )
 
 ```
 
@@ -92,19 +93,6 @@ lookups <- lapply(lookups, janitor::clean_names)
 
 # turns from list of data frames into separate data frames
 list2env(lookups, envir=.GlobalEnv)
-
-# # query to pull organisation lookup table
-# org_query <- "SELECT
-#               Organisation_Code
-#               ,LEFT(Organisation_Code,3) 'Organisation_Trust_Code'
-#               ,Organisation_Name
-#               ,SK_OrganisationTypeID
-#               FROM [Dictionary].[dbo].[Organisation]
-#               where
-#               SK_OrganisationTypeID IN (41,42)"
-# 
-# lookup_organisation <- dbGetQuery(con, org_query) %>% janitor::clean_names(case = "snake")
-
 
 ```
 
@@ -127,7 +115,7 @@ wrangled_data <- combined_data %>%
          TAT_overall,
          data_type,
          data_period,
-         cancer_pathway_flag) %>%
+         cancer_pathway_flag_string) %>%
   # join the lookup tables
   left_join(lookup_patient_source_setting, by = join_by(patient_source_type == code)) %>%
   left_join(lookup_combined_image_code, by = join_by(combined_imaging_code == code)) %>%
@@ -184,11 +172,10 @@ wrangled_data <- combined_data %>%
          patient_source_setting = replace_na(patient_source_setting, "Unclassified"),
          modality.y = replace_na(modality.y, "Unclassified"),
          description = replace_na(description, "Unclassified"), # PriorityTypeCode
-         replace_na(site_group_long, "Unclassified"),
-         replace_na(site_group_short, "Unclassified"),
-         replace_na(trust_long, "Unclassified"),
-         replace_na(trust_short, "Unclassified")
-         
+         site_group_long = replace_na(site_group_long, "Unclassified"),
+         site_group_short = replace_na(site_group_short, "Unclassified"),
+         trust_long = replace_na(trust_long, "Unclassified"),
+         trust_short = replace_na(trust_short, "Unclassified")
   ) %>% 
   # Final select for output
   select(DiagnosticTestDateTime = diagnostic_test_date_time,
@@ -199,7 +186,7 @@ wrangled_data <- combined_data %>%
          ProviderTrust = trust_long,
          ProviderTrustShort = trust_short,
          PriorityTypeCode = description,
-         CancerPathwayFlag = cancer_pathway_flag,
+         CancerPathwayFlag = cancer_pathway_flag_string,
          BreachScan,
          BreachScan7Day,
          TATScan = TAT_scan,

@@ -18,7 +18,11 @@ process_provider_file <- function(file_path) {
     janitor::clean_names(case = "snake") %>%
     
     # remove entirely blank rows
-    filter(!if_all(everything(), ~ is.na(.x))) %>% 
+    filter(!if_all(everything(), ~ is.na(.x))) %>%
+    # remove rows with no test date
+    drop_na(diagnostic_test_date_time) %>%
+    # remove rows with no referral date
+    drop_na(diagnostic_test_request_date_time) %>%
     
     # data transformations
     mutate(
@@ -52,7 +56,10 @@ process_provider_file <- function(file_path) {
       datedifftest = interval(data_period,floor_date(diagnostic_test_date_time, 'month'))/months(1),
       data_type = case_when(datedifftest == -3 ~ "Freeze",
                             datedifftest %in% c(-1,-2) ~ "Flex",
-                            .default = "Out of range")
+                            .default = "Out of range"),
+      cancer_pathway_flag_string = case_when(cancer_pathway_flag == TRUE ~ "Y",
+                                             cancer_pathway_flag == FALSE ~ "N",
+                                             .default = "Unclassified") # need to convert to character for "unclassified"s
       
     ) %>% 
     #filter out out-of-range dates

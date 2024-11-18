@@ -10,11 +10,14 @@ fts <- field_types(
   imaging_code_nicip = ft_freetext(na = NULL),
   imaging_code_snomed = ft_freetext(na = NULL),
   provider_site_code = ft_categorical(aggregate_by_each_category = TRUE),
+  trust_code = ft_categorical(aggregate_by_each_category = TRUE),
   TAT_scan = ft_numeric(na = NULL),
   TAT_report = ft_numeric(na = NULL),
   TAT_overall = ft_numeric(na = NULL),
   data_type = ft_freetext(na = NULL),
-  data_period = ft_datetime(includes_time = FALSE)
+  data_period = ft_datetime(includes_time = FALSE),
+  month_year = ft_freetext(na = NULL),
+  cancer_pathway_flag = ft_categorical(aggregate_by_each_category = FALSE)
 )
 
 
@@ -22,7 +25,8 @@ fts <- field_types(
 daiq_obj <- daiquiri_report(
   combined_data_pared,
   field_types = fts,
-  save_directory = "output/daiquiri"
+  save_directory = "output/daiquiri",
+  aggregation_timeunit = "month"  # day or month? day may get unwieldly in several years' time.
 )
 
 end_time = Sys.time()
