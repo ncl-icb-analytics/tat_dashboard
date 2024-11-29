@@ -27,7 +27,7 @@ daiq_obj <- daiquiri_report(
   field_types = fts,
   save_directory = "output/daiquiri",
   aggregation_timeunit = "month"  # day or month? day may get unwieldly in several years' time.
-)
+) # save this as an RDS
 
 end_time = Sys.time()
 end_time - start_time

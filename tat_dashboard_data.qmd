@@ -57,7 +57,7 @@ all_files <- all_files[grep(submission_month, all_files, perl=T)]
 # apply processing function to list of files to form single dataset
 combined_data <- map_dfr(all_files, process_provider_file)
 
-## Pare down dataset to just essential columns - for if denormalising in SQL
+# Pare down dataset to just essential columns - for if denormalising in SQL
 # combined_data_pared <- combined_data %>% select(diagnostic_test_date_time,
 #                                                 # diagnostic_test_request_date_time,
 #                                                 service_report_issue_date_time,
@@ -250,4 +250,3 @@ message("Flex data deleted.")
 DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
 message("Data appended for ", submission_month,"." )
 ```
-
