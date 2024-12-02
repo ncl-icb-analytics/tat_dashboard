@@ -108,7 +108,7 @@ list2env(lookups, envir=.GlobalEnv)
 
 ```{r}
 
-wrangled_data <- combined_data %>%
+wrangled_data <- combined_data %>% 
   # pre-select so not processing unnecesary columns
   select(diagnostic_test_date_time,
          service_report_issue_date_time,
@@ -212,11 +212,7 @@ wrangled_data <- combined_data %>%
          DataType = data_type
   )
 
-# View(wrangled_data %>% filter(is.na(SiteNameLong) == TRUE))
-# View(wrangled_data %>% filter(ProviderTrustShort == "Unclassified"))
-# View(wrangled_data %>% filter(Modality == "Unclassified"))
-# View(combined_data %>% filter(provider_site_code == "F0U9Q"))
-#View(combined_data %>% filter(is.na(patient_source_type) == TRUE))
+
 
 ```
 
@@ -248,15 +244,15 @@ con <- dbConnect(odbc::odbc(),
 # #1. delete flex data from previous month
 
 # Join provider names to unsubmitted provider codes
-df_submitted_providers <- data.frame(submitted_providers) %>% 
-  rename(trust_code = "submitted_providers") %>% 
+df_submitted_providers <- data.frame(submitted_providers) %>%
+  rename(trust_code = "submitted_providers") %>%
   left_join(lookup_trusts, by = join_by(trust_code == trust_code))
 
 delete_string_provider_short <- paste0("\'",paste(df_submitted_providers$trust_short, collapse = '\', \''),"\'")
 
 delete_query <- paste0("DELETE FROM ", schema_table_name," WHERE DataType = 'Flex' AND ProviderTrustShort IN (",delete_string_provider_short,")"
                        )
- 
+
 # Execute the delete query
 dbExecute(con, delete_query)
 message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = ', ')))
