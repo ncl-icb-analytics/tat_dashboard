@@ -42,6 +42,11 @@ dd.CalendarMonthName
 ORDER BY 
 CalendarMonthNumber
 
+select * 
+from [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
+where 
+dd.CalendarMonthName = 'August' AND DataType = 'Flex'
+
 /*
 SELECT
 *
