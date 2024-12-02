@@ -12,6 +12,9 @@ library(readxl)
 # Import, assign metadata and cleanse data
 # function to transform one file
 process_provider_file <- function(file_path) {
+  
+  message(basename(file_path))
+  
   data <- read_csv(file_path,na = c("NULL","",NULL), show_col_types = FALSE) %>%  # NAs and column types
     
     # clean names
