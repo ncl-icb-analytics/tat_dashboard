@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 params:
   #input_dir: "data/providers"  # Path to the directory where provider folders are stored
   #input_dir: "C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH"
-  submission_month: "Nov24"  # The date of data submission.
+  submission_month: "Jul24"  # The date of data submission.
 format: html
 editor: source
 ---
@@ -41,6 +41,11 @@ schema_name <- "PeterS"
 table_name <- "turnaround_times"
 schema_table_name <- paste(schema_name,table_name,sep = ".")
 db_sch_tbl_name <- paste0(database_name,".",schema_name,".",table_name)
+
+
+gpda_table_name <- "diagnostic_gpda"
+gpda_schema_table_name <- paste(schema_name,gpda_table_name,sep = ".")
+gpda_db_sch_tbl_name <- paste0(database_name,".",schema_name,".",gpda_table_name)
 
 # List all files in the input directory. recursive = FALSE doesn't look in subdirectories (e.g. historical/archive folders)
 all_files <- list.files(input_dir, recursive = FALSE, full.names = TRUE, pattern = "*.csv")
@@ -84,6 +89,42 @@ combined_data <- map_dfr(all_files, process_provider_file)
 #                                                 cancer_pathway_flag
 #                                                 )
 
+```
+## GPDA data
+
+```{r}
+# get into same format as GPDA submission
+
+gpda_data <- combined_data %>%
+  filter(patient_source_type == 4) %>% 
+  mutate(provider_code = trust_code,
+         date_of_test_request = as.Date(diagnostic_test_request_date_time),
+         date_of_test_request_received = as.Date(diagnostic_test_request_received_date_time),
+         date_of_test = as.Date(diagnostic_test_date_time),
+         report_date = as.Date(service_report_issue_date_time),
+         patient_source_setting_description = as.character(NA),
+         modality_code = as.character(NA)
+                                 ) %>%
+  select(file_name,
+         trust_code,
+         provider_code,
+         provider_site_code,
+         date_of_test_request,
+         date_of_test_request_received,
+         date_of_test,
+         report_date,
+         patient_source_setting = patient_source_type,
+         patient_source_setting_description,
+         modality_code,
+         imaging_code_nicip,
+         imaging_code_snomed_ct = imaging_code_snomed,
+         referrer_code,
+         gp_practice = general_medical_practice,
+         gender_code = person_gender,
+         ethnic_category_code = ethnic_category,
+         data_type
+  )
+         
 ```
 
 ## Import lookup tables
@@ -212,8 +253,6 @@ wrangled_data <- combined_data %>%
          DataType = data_type
   )
 
-
-
 ```
 
 ## Establishing a connection to the Sandpit
@@ -236,6 +275,8 @@ con <- dbConnect(odbc::odbc(),
 # DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, overwrite = TRUE) # write to new main table
 # print(paste0(db_sch_tbl_name," overwritten with new data"))
 
+# DBI::dbWriteTable(con, DBI::SQL(gpda_schema_table_name), gpda_data, row.names=F, overwrite = TRUE) # write to new main table
+# print(paste0(gpda_db_sch_tbl_name," overwritten with new data"))
 ```
 
 ## Upload data to sandpit - rolling flex/freeze
@@ -260,4 +301,20 @@ message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = '
 #2. upload new month
 DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
 message("Data appended for ", submission_month,", and provider(s) ", paste0(paste(submitted_providers, collapse = ', ')) ,".")
+```
+
+## Upload data to sandpit - rolling flex/freeze - GPDA
+```{r}
+# delete_string_provider_code <- paste0("\'",paste(df_submitted_providers$trust_code, collapse = '\', \''),"\'")
+# 
+# gpda_delete_query <- paste0("DELETE FROM ", gpda_schema_table_name," WHERE data_type = 'Flex' AND trust_code IN (",delete_string_provider_code,")"
+#                        )
+# 
+# # Execute the delete query
+# dbExecute(con, gpda_delete_query)
+# message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = ', ')))
+# 
+# #2. upload new month
+# DBI::dbWriteTable(con, DBI::SQL(gpda_schema_table_name), gpda_data, row.names=F, append = TRUE) # write to new main table
+#message("Data appended for ", submission_month,", and provider(s) ", paste0(paste(submitted_providers, collapse = ', ')) ,".")
 ```
