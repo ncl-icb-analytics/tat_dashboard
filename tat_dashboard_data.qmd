@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 params:
   #input_dir: "data/providers"  # Path to the directory where provider folders are stored
   #input_dir: "C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH"
-  submission_month: "Jul24"  # The date of data submission.
+  submission_month: "Jan25"  # The date of data submission.
 format: html
 editor: source
 ---
@@ -24,13 +24,13 @@ source('src/functions.R')
 #| echo: false
 
 # Define parameters for the file paths and other variables
-input_dir <- c(r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\MEH}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RFL}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RNOH}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\UCLH}",
-               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\Whittington}"
+input_dir <- c(#r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH}",
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\MEH}",
+               r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\NMUH}"#,
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RFL}",
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\RNOH}",
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\UCLH}",
+               #r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\Whittington}"
                )
 
 submission_month <- params$submission_month
@@ -88,7 +88,6 @@ combined_data <- map_dfr(all_files, process_provider_file)
 #                                                 month_year,
 #                                                 cancer_pathway_flag
 #                                                 )
-
 ```
 ## GPDA data
 
