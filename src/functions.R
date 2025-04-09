@@ -15,7 +15,7 @@ process_provider_file <- function(file_path) {
   
   message(basename(file_path))
   
-  data <- read_csv(file_path,na = c("NULL","",NULL,"1900-01-00 00:00"), show_col_types = FALSE) %>%  # NAs and column types
+  data <- read_csv(file_path,na = c("NULL","",NULL,"1900-01-00 00:00","1900-01-00 00:00:00"), show_col_types = FALSE) %>%  # NAs and column types
     
     # clean names
     janitor::clean_names(case = "snake") %>%
