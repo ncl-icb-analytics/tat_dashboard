@@ -284,21 +284,81 @@ con <- dbConnect(odbc::odbc(),
 # #1. delete flex data from previous month
 
 # Join provider names to unsubmitted provider codes
-df_submitted_providers <- data.frame(submitted_providers) %>%
-  rename(trust_code = "submitted_providers") %>%
-  left_join(lookup_trusts, by = join_by(trust_code == trust_code))
 
-delete_string_provider_short <- paste0("\'",paste(df_submitted_providers$trust_short, collapse = '\', \''),"\'")
+# df_submitted_providers <- data.frame(submitted_providers) %>%
+#   rename(trust_code = "submitted_providers") %>%
+#   left_join(lookup_trusts, by = join_by(trust_code == trust_code))
+# 
+# delete_string_provider_short <- paste0("\'",paste(df_submitted_providers$trust_short, collapse = '\', \''),"\'")
+# 
+# delete_query <- paste0("DELETE FROM ", schema_table_name," WHERE DataType = 'Flex' AND ProviderTrustShort IN (",delete_string_provider_short,")"
+#                        )
+# 
+# # Execute the delete query
+# dbExecute(con, delete_query)
+# message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = ', ')))
+# 
+# #2. upload new month
+# DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
+# message("Data appended for ", submission_month,", and provider(s) ", paste0(paste(submitted_providers, collapse = ', ')) ,".")
+```
+## Upload data to sandpit - rolling flex/freeze - Raw
+```{r}
+# #1. delete flex data from previous month
 
-delete_query <- paste0("DELETE FROM ", schema_table_name," WHERE DataType = 'Flex' AND ProviderTrustShort IN (",delete_string_provider_short,")"
+combined_data <- combined_data %>% select(
+                        submission_date
+                        ,data_type
+                        ,month
+                        ,year
+                        ,ethnic_category
+                        ,person_gender
+                        ,general_medical_practice
+                        ,patient_source_type
+                        ,referrer_code
+                        ,referring_org
+                        ,diagnostic_test_request_date_time
+                        ,diagnostic_test_request_received_date_time
+                        ,diagnostic_test_date_time
+                        ,service_report_issue_date_time
+                        ,imaging_code_nicip
+                        ,imaging_code_snomed
+                        ,provider_site_code
+                        ,priority_type_code
+                        ,cancer_pathway_flag
+                        ,file_name
+                        ,month_year
+                        ,submission_month
+                        ,submission_year
+                        ,data_period
+                        ,trust_code
+                        ,combined_imaging_code
+                        ,priority_type_code_routine_default
+                        ,TAT_scan
+                        ,TAT_report
+                        ,TAT_overall
+                        ,datedifftest
+                        ,cancer_pathway_flag_string
+                        ,referring_organisation
+                        )
+
+table_name_raw <- "turnaround_times_raw"
+schema_table_name_raw <- paste(schema_name,table_name_raw,sep = ".")
+db_sch_tbl_name_raw <- paste0(database_name,".",schema_name,".",table_name_raw)
+
+df_submitted_providers_raw <- data.frame(submitted_providers)
+
+delete_string_provider_short_raw <- paste0("\'",paste(df_submitted_providers_raw$submitted_providers, collapse = '\', \''),"\'")
+
+delete_query_raw <- paste0("DELETE FROM ", schema_table_name_raw," WHERE data_type = 'Flex' AND trust_code IN (",delete_string_provider_short_raw,")"
                        )
 
 # Execute the delete query
-dbExecute(con, delete_query)
+dbExecute(con, delete_query_raw)
 message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = ', ')))
 
 #2. upload new month
-DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
+DBI::dbWriteTable(con, DBI::SQL(schema_table_name_raw), combined_data, row.names=F, append = TRUE) # write to new main table
 message("Data appended for ", submission_month,", and provider(s) ", paste0(paste(submitted_providers, collapse = ', ')) ,".")
 ```
 

@@ -1,64 +1,98 @@
+/* Processed */
+
+-- Check by month/year
 SELECT
+dd.FiscalCalendarYearName
+,dd.CalendarMonthName
+,FiscalCalendarMonthNumber
+,r.DataType
+,COUNT(*) 'RowCount'
+FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] r
+LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
+GROUP BY
 dd.CalendarMonthName
-,dd.CalendarMonthNumber
+,FiscalCalendarMonthNumber
+,r.DataType
+,dd.FiscalCalendarYearName
+ORDER BY
+dd.FiscalCalendarYearName
+,FiscalCalendarMonthNumber
+
+-- Check by provider - by month/year
+SELECT
+dd.FiscalCalendarYearName
+,dd.CalendarMonthName
+,FiscalCalendarMonthNumber
+,r.DataType
+,r.ProviderTrust
+,COUNT(*) 'RowCount'
+FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] r
+LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
+GROUP BY
+dd.CalendarMonthName
+,FiscalCalendarMonthNumber
+,r.DataType
+,r.ProviderTrust
+,dd.FiscalCalendarYearName
+ORDER BY 
+dd.FiscalCalendarYearName
+,FiscalCalendarMonthNumber
+
+/* Raw */
+-- check by month/year
+SELECT
+dd.FiscalCalendarYearName
+,dd.CalendarMonthName
+,FiscalCalendarMonthNumber
 ,r.data_type
-,COUNT(*)
-FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_rolltest] r
+,COUNT(*) 'RowCount'
+FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_raw] r
 LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(diagnostic_test_date_time as date) = dd.FullDate
 GROUP BY
-dd.CalendarMonthName
-,dd.CalendarMonthNumber
+dd.FiscalCalendarYearName
+,dd.CalendarMonthName
+,FiscalCalendarMonthNumber
 ,r.data_type
-ORDER BY 
-CalendarMonthNumber
+ORDER BY
+dd.FiscalCalendarYearName
+,FiscalCalendarMonthNumber
+,r.data_type
 
+-- Check by provider - by month/year
 SELECT
-dd.CalendarMonthName
-,dd.CalendarMonthNumber
-,r.DataType
+dd.FiscalCalendarYearName
+,dd.CalendarMonthName
+,FiscalCalendarMonthNumber
+,r.data_type
+,r.trust_code
 ,COUNT(*) 'RowCount'
-FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] r
-LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
+FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_raw] r
+LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(diagnostic_test_date_time as date) = dd.FullDate
 GROUP BY
-dd.CalendarMonthName
-,dd.CalendarMonthNumber
-,r.DataType
+dd.FiscalCalendarYearName
+,dd.CalendarMonthName
+,FiscalCalendarMonthNumber
+,r.data_type
+,r.trust_code
 ORDER BY 
-CalendarMonthNumber
+dd.FiscalCalendarYearName
+,FiscalCalendarMonthNumber
+,r.data_type
 
-SELECT
-dd.CalendarMonthName
-,dd.CalendarMonthNumber
-,r.DataType
-,r.ProviderTrust
-,COUNT(*) 'RowCount'
-FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] r
-LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
-GROUP BY
-dd.CalendarMonthName
-,dd.CalendarMonthNumber
-,r.DataType
-,r.ProviderTrust
-ORDER BY 
-CalendarMonthNumber
-
+-- NMUH check
 select * 
 from [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
 where 
 ProviderTrustShort = 'NMUH'
 AND CalendarMonthName = 'August'
-/*
-SELECT
-*
-INTO [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_archive_241118]
-FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times]
-*/
 
 -- DELETE FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times]
+-- DELETE FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_raw]
 
 -- DROP TABLE [Data_Lab_NCL_Dev].[PeterS].[turnaround_times]
---DELETE FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] where ProviderTrustShort = 'GOSH'
+-- DROP TABLE [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_raw]
 
+-- gpda check
 SELECT
 dd.CalendarMonthName
 ,dd.CalendarMonthNumber
