@@ -56,7 +56,7 @@ process_provider_file <- function(file_path) {
       TAT_scan = round(interval(diagnostic_test_request_date_time,diagnostic_test_date_time)/hours(1)),
       TAT_report = round(interval(diagnostic_test_date_time,service_report_issue_date_time)/hours(1)),
       TAT_overall = round(interval(diagnostic_test_request_date_time,service_report_issue_date_time)/hours(1)),
-      datedifftest = interval(data_period,floor_date(diagnostic_test_date_time, 'month'))/months(1),
+      datedifftest = round(interval(data_period,floor_date(diagnostic_test_date_time, 'month'))/months(1), digits = 0),
       data_type = case_when(basename(file_path) == "20241028_DIDNCL_RAN_Jul24.csv" ~ "Freeze",
                             datedifftest == -3 ~ "Freeze",
                             datedifftest %in% c(-1,-2) ~ "Flex",

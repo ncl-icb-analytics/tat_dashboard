@@ -88,6 +88,15 @@ combined_data <- map_dfr(all_files, process_provider_file)
 #                                                 month_year,
 #                                                 cancer_pathway_flag
 #                                                 )
+
+# Fix UCLH and RFL missing Feb submissions. 
+# We lose November data as it is deleted as flex data during the Feb upload. 
+# Need to manually add November data back from the Jan file where it would be freeze and change it to flex.
+# Then manually upload WITHOUT deleting any flex data.
+
+# combined_data_novfix <- combined_data %>% filter(diagnostic_test_date_time >= as.Date("2024-11-01") & diagnostic_test_date_time <= as.Date("2024-11-30"))
+# combined_data_novfix$data_type <- "Freeze"
+# combined_data <- combined_data_novfix
 ```
 ## GPDA data
 
@@ -252,6 +261,7 @@ wrangled_data <- combined_data %>%
          DataType = data_type
   )
 
+
 ```
 
 ## Establishing a connection to the Sandpit
@@ -285,28 +295,30 @@ con <- dbConnect(odbc::odbc(),
 
 # Join provider names to unsubmitted provider codes
 
-# df_submitted_providers <- data.frame(submitted_providers) %>%
-#   rename(trust_code = "submitted_providers") %>%
-#   left_join(lookup_trusts, by = join_by(trust_code == trust_code))
-# 
-# delete_string_provider_short <- paste0("\'",paste(df_submitted_providers$trust_short, collapse = '\', \''),"\'")
-# 
-# delete_query <- paste0("DELETE FROM ", schema_table_name," WHERE DataType = 'Flex' AND ProviderTrustShort IN (",delete_string_provider_short,")"
-#                        )
-# 
-# # Execute the delete query
-# dbExecute(con, delete_query)
-# message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = ', ')))
-# 
-# #2. upload new month
-# DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
-# message("Data appended for ", submission_month,", and provider(s) ", paste0(paste(submitted_providers, collapse = ', ')) ,".")
+df_submitted_providers <- data.frame(submitted_providers) %>%
+  rename(trust_code = "submitted_providers") %>%
+  left_join(lookup_trusts, by = join_by(trust_code == trust_code))
+
+delete_string_provider_short <- paste0("\'",paste(df_submitted_providers$trust_short, collapse = '\', \''),"\'")
+
+delete_query <- paste0("DELETE FROM ", schema_table_name," WHERE DataType = 'Flex' AND ProviderTrustShort IN (",delete_string_provider_short,")"
+                       )
+
+# Execute the delete query
+dbExecute(con, delete_query)
+message("Flex data deleted for ", paste0(paste(submitted_providers, collapse = ', ')))
+
+#2. upload new month
+DBI::dbWriteTable(con, DBI::SQL(schema_table_name), wrangled_data, row.names=F, append = TRUE) # write to new main table
+message("Data appended for ", submission_month,", and provider(s) ", paste0(paste(submitted_providers, collapse = ', ')) ,".")
 ```
 ## Upload data to sandpit - rolling flex/freeze - Raw
 ```{r}
 # #1. delete flex data from previous month
 
-combined_data <- combined_data %>% select(
+combined_data <- combined_data %>% 
+  mutate(referring_organisation = NA) %>% 
+  select(
                         submission_date
                         ,data_type
                         ,month

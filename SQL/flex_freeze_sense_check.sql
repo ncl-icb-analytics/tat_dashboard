@@ -9,6 +9,7 @@ dd.FiscalCalendarYearName
 ,COUNT(*) 'RowCount'
 FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times] r
 LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(DiagnosticTestDateTime as date) = dd.FullDate
+--WHERE ProviderTrustShort = 'RNOH'
 GROUP BY
 dd.CalendarMonthName
 ,FiscalCalendarMonthNumber
@@ -17,6 +18,7 @@ dd.CalendarMonthName
 ORDER BY
 dd.FiscalCalendarYearName
 ,FiscalCalendarMonthNumber
+
 
 -- Check by provider - by month/year
 SELECT
@@ -48,6 +50,7 @@ dd.FiscalCalendarYearName
 ,COUNT(*) 'RowCount'
 FROM [Data_Lab_NCL_Dev].[PeterS].[turnaround_times_raw] r
 LEFT JOIN [Dictionary].[dbo].[Dates] dd ON CAST(diagnostic_test_date_time as date) = dd.FullDate
+--WHERE trust_code = 'RAN'
 GROUP BY
 dd.FiscalCalendarYearName
 ,dd.CalendarMonthName
