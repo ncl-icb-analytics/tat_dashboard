@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 params:
   #input_dir: "data/providers"  # Path to the directory where provider folders are stored
   #input_dir: "C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provider Submissions\GOSH"
-  submission_month: "Mar25"  # The date of data submission.
+  submission_month: "Apr25"  # The date of data submission.
 format: html
 editor: source
 ---
@@ -36,8 +36,11 @@ input_dir <- c(r"{C:\Users\PeterShakeshaft\OneDrive - NHS\Turnaround Times\Provi
 submission_month <- params$submission_month
 
 dsn_name <- "SANDPIT"
-database_name <- "Data_Lab_NCL_Dev"
-schema_name <- "PeterS"
+# database_name <- "Data_Lab_NCL_Dev"
+# schema_name <- "PeterS"
+# table_name <- "turnaround_times"
+database_name <- "DATA_LAB_NCL_TRAINING_TEMP"
+schema_name <- r"{"PeterS"}"
 table_name <- "turnaround_times"
 schema_table_name <- paste(schema_name,table_name,sep = ".")
 db_sch_tbl_name <- paste0(database_name,".",schema_name,".",table_name)
@@ -271,9 +274,12 @@ wrangled_data <- combined_data %>%
 # Connect to the Sandpit
 
 con <- dbConnect(odbc::odbc(),
-                 dsn = dsn_name,
+                 #dsn = dsn_name,
+                 dsn = "SNOWPIT",
                  database = database_name,
                  TrustedConnection = TRUE)
+
+
 ```
 
 ## Upload data to sandpit (basic bulk upload or setting new columns)
